@@ -19,7 +19,7 @@
 //
 #assert(#exists(Version));
 #assert(is_an_enum(Version));
-#assert((cast(*Type_Info_Enum) Version).internal_type == type_info(s32));
+#assert(get_internal_enum_type(Version) == s32);
 #assert(enum_has_values(Version, .["INVALID", "INITIAL", "LATEST"]));
 
 LBP_Serializer :: struct {
