@@ -68,20 +68,14 @@ lbp_init :: (file_path: string, mode: LBP_Serializer.Mode) -> bool, LBP_Serializ
 // Takes ownership of bytes.
 //
 lbp_init :: (bytes: [..]u8, file_path: string, mode: LBP_Serializer.Mode) -> bool, LBP_Serializer {
-    ser: LBP_Serializer = .{ .INVALID, 0, bytes, 0, file_path, mode };
-    if mode == {
-        case .SERIALIZE;
-            ser.data_version = .LATEST;
-            serialize(*ser, *ser.data_version);
+    ser: LBP_Serializer = .{ .LATEST, 0, bytes, 0, file_path, mode };
 
-        case .DESERIALIZE;
-            version := read_type(*ser, Version);
+    serialize(*ser, *ser.data_version);
 
-            if version > .LATEST {
-                return false, .{};
-            }
-
-            ser.data_version = version;
+    if mode == .DESERIALIZE {
+        if ser.data_version > .LATEST {
+            return false, .{};
+        }
     }
 
     assert(ser.data_version != .INVALID);
