@@ -20,7 +20,7 @@
 #assert(#exists(Version));
 #assert(is_an_enum(Version));
 #assert(get_internal_enum_type(Version) == s32);
-#assert(enum_has_values(Version, .["INVALID", "INITIAL", "LATEST"]));
+#assert(enum_has_names(Version, .["INVALID", "INITIAL", "LATEST"]));
 
 LBP_Serializer :: struct {
     data_version:      Version = .INVALID;
@@ -266,20 +266,20 @@ is_an_enum :: ($$ti: *Type_Info) -> bool {
     return ti.type == .ENUM;
 }
 
-enum_has_value :: ($E: Type, value: string) -> bool {
+enum_has_name :: ($E: Type, name: string) -> bool {
     #assert(is_an_enum(E));
 
     ti := cast(*Type_Info_Enum) E;
     for ti.names {
-        if it == value return true;
+        if it == name return true;
     }
 
     return false;
 }
 
-enum_has_values :: ($E: Type, values: []string) -> bool {
-    for values {
-        if !enum_has_value(E, it) return false;
+enum_has_names :: ($E: Type, names: []string) -> bool {
+    for names {
+        if !enum_has_name(E, it) return false;
     }
 
     return true;
