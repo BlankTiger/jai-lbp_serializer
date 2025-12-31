@@ -1,0 +1,287 @@
+//
+// All credit for the methodology goes to https://handmade.network/p/29/swedish-cubes-for-unity/blog/p/2723-how_media_molecule_does_serialization
+//
+// This module is expected to be used as a #load dependency. User of it is
+// expected to provide a Version enum with requirements specified in the module
+// code below.
+//
+// Originally this was an #import module parametrized by Version type with
+// program parameters, but user defined serialize procedures were not seen by
+// the compiler when calling add and rem.
+//
+// If you deserialize arrays, then stuff will be allocated by the context.allocator
+// to make that happen.
+//
+
+//
+// This is to make sure that the size of Version type remains stable as it
+// would be difficult to change it in a backwards compatible way.
+//
+#assert(#exists(Version));
+#assert(is_an_enum(Version));
+#assert((cast(*Type_Info_Enum) Version).internal_type == type_info(s32));
+#assert(enum_has_values(Version, .["INVALID", "INITIAL", "LATEST"]));
+
+LBP_Serializer :: struct {
+    data_version:      Version = .INVALID;
+    integrity_counter: s32;
+    bytes:             [..]u8;
+    offset_into_bytes: s64;
+    path_to_save_file: string;
+    mode:              Mode;
+
+    Mode :: enum #complete { SERIALIZE; DESERIALIZE; }
+}
+
+lbp_deinit :: (s: *LBP_Serializer) {
+    //
+    // For the duration of deserializing there is a null allocator on s.bytes
+    // to disallow allocations, but when freeing we use what we used when
+    // loading the bytes from the file.
+    //
+    s.bytes.allocator = context.allocator;
+    array_free(s.bytes);
+}
+
+lbp_commit_to_disk :: (s: *LBP_Serializer) -> bool {
+    bytes_as_str := cast(string) s.bytes;
+    ok := write_entire_file(s.path_to_save_file, bytes_as_str);
+    return ok;
+}
+
+lbp_init :: (file_path: string, mode: LBP_Serializer.Mode) -> bool, LBP_Serializer {
+    bytes: [..]u8;
+    if mode == .DESERIALIZE {
+        bytes_as_str, ok := read_entire_file(file_path);
+        if !ok return false, .{};
+
+        bytes.data      = bytes_as_str.data;
+        bytes.count     = bytes_as_str.count;
+        bytes.allocator = null_allocator;
+    }
+
+    ok, ser := lbp_init(bytes, file_path, mode);
+    return ok, ser;
+}
+
+//
+// Takes ownership of bytes.
+//
+lbp_init :: (bytes: [..]u8, file_path: string, mode: LBP_Serializer.Mode) -> bool, LBP_Serializer {
+    ser: LBP_Serializer = .{ .INVALID, 0, bytes, 0, file_path, mode };
+    if mode == {
+        case .SERIALIZE;
+            ser.data_version = .LATEST;
+            bytes: []u8;
+            bytes.data  = xx *ser.data_version;
+            bytes.count = size_of(Version);
+            write_bytes(*ser, bytes);
+
+        case .DESERIALIZE;
+            version := read_type(*ser, Version);
+
+            if version > .LATEST {
+                return false, .{};
+            }
+
+            ser.data_version = version;
+    }
+
+    assert(ser.data_version != .INVALID);
+    return true, ser;
+}
+
+read_bytes :: (s: *LBP_Serializer, byte_count: s64) -> []u8 {
+    bytes: []u8;
+    bytes.data  = s.bytes.data + s.offset_into_bytes;
+    bytes.count = byte_count;
+    s.offset_into_bytes += byte_count;
+    return bytes;
+}
+
+read_type :: (s: *LBP_Serializer, $T: Type) -> T {
+    bytes := read_bytes(s, size_of(T));
+    type := bytes.data.(*T).*;
+    return type;
+}
+
+write_bytes :: (s: *LBP_Serializer, bytes: []u8) {
+    array_add(*s.bytes, ..bytes);
+}
+
+serialize :: (s: *LBP_Serializer, number: *$T) #modify { return is_a_number_type(T); } {
+    if s.mode == {
+        case .SERIALIZE;
+            bytes: []u8;
+            bytes.data  = xx number;
+            bytes.count = size_of(T);
+            write_bytes(s, bytes);
+
+        case .DESERIALIZE;
+            number.* = read_type(s, T);
+    }
+}
+
+serialize :: (s: *LBP_Serializer, big_int: *S128) {
+    if s.mode == {
+        case .SERIALIZE;
+            bytes: []u8;
+            bytes.data  = xx big_int;
+            bytes.count = size_of(S128);
+            write_bytes(s, bytes);
+
+        case .DESERIALIZE;
+            big_int.* = read_type(s, S128);
+    }
+}
+
+serialize :: (s: *LBP_Serializer, text: *string) {
+    if s.mode == {
+        case .SERIALIZE;
+            serialize(s, *text.count);
+            write_bytes(s, cast([]u8) text.*);
+
+        case .DESERIALIZE;
+            serialize(s, *text.count);
+            bytes := read_bytes(s, text.count);
+            assert(bytes.count == text.count);
+            text.data = bytes.data;
+    }
+}
+
+serialize :: (s: *LBP_Serializer, _bool: *bool) {
+    if s.mode == {
+        case .SERIALIZE;
+            bytes: []u8;
+            bytes.data  = xx _bool;
+            bytes.count = size_of(bool);
+            write_bytes(s, bytes);
+
+        case .DESERIALIZE;
+            bytes := read_bytes(s, size_of(bool));
+            _bool = xx bytes.data;
+    }
+}
+
+serialize :: (s: *LBP_Serializer, vec2: *Vector2) {
+    serialize(s, *vec2.x);
+    serialize(s, *vec2.y);
+}
+
+serialize :: (s: *LBP_Serializer, vec3: *Vector3) {
+    serialize(s, *vec3.x);
+    serialize(s, *vec3.y);
+    serialize(s, *vec3.z);
+}
+
+serialize :: (s: *LBP_Serializer, vec4: *Vector4) {
+    serialize(s, *vec4.x);
+    serialize(s, *vec4.y);
+    serialize(s, *vec4.z);
+    serialize(s, *vec4.w);
+}
+
+serialize :: (s: *LBP_Serializer, _enum: *$T) #modify { return is_an_enum(T); } {
+    Int_Type :: #run get_internal_enum_type(T);
+    serialize(s, cast(*Int_Type) _enum);
+}
+
+serialize :: (s: *LBP_Serializer, apollo_time: *Apollo_Time) {
+    Variant_Type :: #run get_type_of_variant(Apollo_Time);
+    serialize(s, cast(*Variant_Type) apollo_time);
+}
+
+serialize :: (s: *LBP_Serializer, resizable_array: *[..]$T) {
+    count := resizable_array.count;
+    serialize(s, *count);
+    array_resize(resizable_array, count);
+
+    for * resizable_array.* {
+        serialize(s, it);
+    }
+}
+
+serialize :: (s: *LBP_Serializer, array: *[]$T) {
+    count := array.count;
+    serialize(s, *count);
+
+    if array.count != count {
+        new_array, _unaligned_base := NewArray(count, T);
+        array.* = new_array;
+    }
+
+    for * array.* {
+        serialize(s, it);
+    }
+}
+
+serialize :: (s: *LBP_Serializer, array: *[$N]$T) {
+    for * array.* {
+        serialize(s, it);
+    }
+}
+
+add :: (s: *LBP_Serializer, $added_in_version: Version, datum: *$T) {
+    if s.data_version >= added_in_version {
+        serialize(s, datum);
+    }
+}
+
+rem :: (s: *LBP_Serializer, $added_in_version: Version, $removed_in_version: Version, $T: Type) -> T {
+    value: T;
+
+    if s.data_version >= added_in_version && s.data_version < removed_in_version {
+        serialize(s, *value);
+    }
+
+    return value;
+}
+
+check_integrity :: (s: *LBP_Serializer, $added_in_version: Version) {
+    if s.data_version >= added_in_version {
+        check := s.integrity_counter;
+        serialize(s, *check);
+        assert(check == s.integrity_counter, "Integrity check failed at version %. File counter: %, code counter: %.", added_in_version, check, s.integrity_counter);
+        s.integrity_counter += 1;
+    }
+}
+
+#scope_file
+
+null_allocator: Allocator = .{
+    data = null,
+    proc = null_allocator_proc,
+};
+
+null_allocator_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s64, old_memory: *void, allocator_data: *void) -> *void {
+    unreachable("This allocator is explicitly for disallowing allocations entirely.");
+    return null;
+}
+
+is_an_enum :: ($$type: Type) -> bool {
+    return is_an_enum(cast(*Type_Info) type);
+}
+
+enum_has_value :: ($E: Type, value: string) -> bool {
+    #assert(is_an_enum(E));
+
+    ti := cast(*Type_Info_Enum) E;
+    for ti.names {
+        if it == value return true;
+    }
+
+    return false;
+}
+
+enum_has_values :: ($E: Type, values: []string) -> bool {
+    for values {
+        if !enum_has_value(E, it) return false;
+    }
+
+    return true;
+}
+
+#import "Basic";
+#import "File";
+#import "File_Utilities";
+#import "Math";
