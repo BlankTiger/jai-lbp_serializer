@@ -254,7 +254,7 @@ null_allocator: Allocator = .{
 };
 
 null_allocator_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s64, old_memory: *void, allocator_data: *void) -> *void {
-    unreachable("This allocator is explicitly for disallowing allocations entirely.");
+    assert(false, "This allocator is explicitly for disallowing allocations entirely.");
     return null;
 }
 
