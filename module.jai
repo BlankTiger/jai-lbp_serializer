@@ -262,6 +262,10 @@ is_an_enum :: ($$type: Type) -> bool {
     return is_an_enum(cast(*Type_Info) type);
 }
 
+is_an_enum :: ($$ti: *Type_Info) -> bool {
+    return ti.type == .ENUM;
+}
+
 enum_has_value :: ($E: Type, value: string) -> bool {
     #assert(is_an_enum(E));
 
