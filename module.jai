@@ -72,10 +72,7 @@ lbp_init :: (bytes: [..]u8, file_path: string, mode: LBP_Serializer.Mode) -> boo
     if mode == {
         case .SERIALIZE;
             ser.data_version = .LATEST;
-            bytes: []u8;
-            bytes.data  = xx *ser.data_version;
-            bytes.count = size_of(Version);
-            write_bytes(*ser, bytes);
+            serialize(*ser, *ser.data_version);
 
         case .DESERIALIZE;
             version := read_type(*ser, Version);
