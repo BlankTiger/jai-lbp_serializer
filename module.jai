@@ -33,24 +33,9 @@ LBP_Serializer :: struct {
     Mode :: enum #complete { SERIALIZE; DESERIALIZE; }
 }
 
-lbp_deinit :: (s: *LBP_Serializer) {
-    //
-    // For the duration of deserializing there is a null allocator on s.bytes
-    // to disallow allocations, but when freeing we use what we used when
-    // loading the bytes from the file.
-    //
-    s.bytes.allocator = context.allocator;
-    array_free(s.bytes);
-}
-
-lbp_commit_to_disk :: (s: *LBP_Serializer) -> bool {
-    bytes_as_str := cast(string) s.bytes;
-    ok := write_entire_file(s.path_to_save_file, bytes_as_str);
-    return ok;
-}
-
 lbp_init :: (file_path: string, mode: LBP_Serializer.Mode) -> bool, LBP_Serializer {
     bytes: [..]u8;
+
     if mode == .DESERIALIZE {
         bytes_as_str, ok := read_entire_file(file_path);
         if !ok return false, .{};
@@ -60,26 +45,35 @@ lbp_init :: (file_path: string, mode: LBP_Serializer.Mode) -> bool, LBP_Serializ
         bytes.allocator = null_allocator;
     }
 
-    ok, ser := lbp_init(bytes, file_path, mode);
-    return ok, ser;
-}
-
-//
-// Takes ownership of bytes.
-//
-lbp_init :: (bytes: [..]u8, file_path: string, mode: LBP_Serializer.Mode) -> bool, LBP_Serializer {
     ser: LBP_Serializer = .{ .LATEST, 0, bytes, 0, file_path, mode };
-
     serialize(*ser, *ser.data_version);
 
-    if mode == .DESERIALIZE {
-        if ser.data_version > .LATEST {
-            return false, .{};
-        }
+    if mode == .DESERIALIZE && ser.data_version > .LATEST {
+        return false, .{};
     }
 
     assert(ser.data_version != .INVALID);
     return true, ser;
+}
+
+lbp_reserve :: inline (s: *LBP_Serializer, count: s64) {
+    array_reserve(*s.bytes, count);
+}
+
+lbp_commit_to_disk :: (s: *LBP_Serializer) -> bool {
+    bytes_as_str := cast(string) s.bytes;
+    ok := write_entire_file(s.path_to_save_file, bytes_as_str);
+    return ok;
+}
+
+lbp_deinit :: (s: *LBP_Serializer) {
+    //
+    // For the duration of deserializing there is a null allocator on s.bytes
+    // to disallow allocations, but when freeing we use what we used when
+    // loading the bytes from the file.
+    //
+    s.bytes.allocator = context.allocator;
+    array_free(s.bytes);
 }
 
 read_bytes :: (s: *LBP_Serializer, byte_count: s64) -> []u8 {
