@@ -285,6 +285,43 @@ enum_has_values :: ($E: Type, values: []string) -> bool {
     return true;
 }
 
+is_a_number_type :: (type: Type) -> bool {
+    return is_a_number_type(cast(*Type_Info) type);
+}
+
+is_a_number_type :: (ti: *Type_Info) -> bool {
+    type := ti.type;
+    if type == .VARIANT && is_a_number_type(cast(*Type_Info_Variant, ti).variant_of.type) {
+        return true;
+    }
+    return is_a_number_type(type);
+}
+
+is_a_number_type :: (type: Type_Info_Tag) -> bool {
+    return type == .FLOAT || type == .INTEGER;
+}
+
+get_internal_enum_type :: ($E: Type) -> Type {
+    ti :: type_info(E);
+    #assert(is_an_enum(ti));
+    ti_e :: cast(*Type_Info_Enum) ti;
+
+    return get_type(ti_e.internal_type);
+}
+
+is_a_variant_type :: ($T: Type) -> bool {
+    ti := cast(*Type_Info) T;
+    return ti.type == .VARIANT;
+}
+
+get_type_of_variant :: ($T: Type) -> Type {
+    #assert(is_a_variant_type(T));
+    ti := cast(*Type_Info_Variant) T;
+    Variant_Type := get_type(ti.variant_of);
+    return Variant_Type;
+}
+
+#import "Compiler";
 #import "Basic";
 #import "File";
 #import "File_Utilities";
