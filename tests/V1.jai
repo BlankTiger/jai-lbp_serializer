@@ -5,12 +5,10 @@ main :: () {
 
     save_file_path :: "tests/build/game_V1.dat";
 
-    ok: bool;
-    ok = save_game(save_file_path, *game);
+    ok := save_game(save_file_path, *game);
     assert(ok);
 
-    loaded_game: Game;
-    ok, loaded_game = load_game(save_file_path);
+    ok=, loaded_game := load_game(save_file_path);
     assert(ok);
 
     compare_array(loaded_game.list_of_names, game.list_of_names);

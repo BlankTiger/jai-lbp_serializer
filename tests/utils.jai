@@ -16,7 +16,9 @@ save_game :: (path_to_save: string, state: *Game) -> bool {
     serialize(*s, state);
 
     ok = lbp_commit_to_disk(*s);
-    log("Saved '%'.", path_to_save);
+    if ok log("Saved '%'.", path_to_save);
+    else  log("Couldn't save '%'.", path_to_save);
+
     return ok;
 }
 
