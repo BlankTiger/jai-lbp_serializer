@@ -11,7 +11,7 @@ compare_array :: (a: []$T, b: []T) {
 save_game :: (path_to_save: string, state: *Game) -> bool {
     ok, s := lbp_init(path_to_save, .SERIALIZE);
     if !ok return false;
-    defer lbp_deinit(*s);
+    defer lbp_deinit(*s, clear_memory_before_dealloc = true);
 
     serialize(*s, state);
 
@@ -23,7 +23,7 @@ save_game :: (path_to_save: string, state: *Game) -> bool {
 load_game :: (path_to_save: string) -> bool, Game {
     ok, s := lbp_init(path_to_save, .DESERIALIZE);
     if !ok return false, .{};
-    defer lbp_deinit(*s);
+    defer lbp_deinit(*s, clear_memory_before_dealloc = true);
 
     state: Game;
     serialize(*s, *state);

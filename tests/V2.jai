@@ -9,13 +9,11 @@ main :: () {
     save_file_path_V1 :: "tests/build/game_V1.dat";
     save_file_path_V2 :: "tests/build/game_V2.dat";
 
-    ok: bool;
-    ok = save_game(save_file_path_V2, *game);
+    ok := save_game(save_file_path_V2, *game);
     assert(ok);
 
     {
-        loaded_game_V1: Game;
-        ok, loaded_game_V1 = load_game(save_file_path_V1);
+        ok, loaded_game_V1 := load_game(save_file_path_V1);
         assert(ok);
 
         compare_array(loaded_game_V1.list_of_names,    .["Alice", "Mark", "Greg"]);
@@ -23,8 +21,7 @@ main :: () {
     }
 
     {
-        loaded_game_V2: Game;
-        ok, loaded_game_V2 = load_game(save_file_path_V2);
+        ok, loaded_game_V2 := load_game(save_file_path_V2);
         assert(ok);
 
         compare_array(loaded_game_V2.list_of_names,    game.list_of_names);
@@ -34,7 +31,7 @@ main :: () {
     log("V2 works fine.");
 }
 
-Version :: enum s32 {
+LBP_Version :: enum s32 {
     INVALID :: -1;
     INITIAL;
     ADDED_COLLECTOR;

@@ -18,7 +18,7 @@ main :: () {
     log("V1 works fine.");
 }
 
-Version :: enum s32 {
+LBP_Version :: enum s32 {
     INVALID :: -1;
     INITIAL;
     LATEST :: INITIAL;

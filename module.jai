@@ -2,10 +2,10 @@
 // All credit for the methodology goes to https://handmade.network/p/29/swedish-cubes-for-unity/blog/p/2723-how_media_molecule_does_serialization
 //
 // This module is expected to be used as a #load dependency. User of it is
-// expected to provide a Version enum with requirements specified in the module
+// expected to provide a LBP_Version enum with requirements specified in the module
 // code below.
 //
-// Originally this was an #import module parametrized by Version type with
+// Originally this was an #import module parametrized by LBP_Version type with
 // program parameters, but user defined serialize procedures were not seen by
 // the compiler when calling add and rem.
 //
@@ -14,16 +14,16 @@
 //
 
 //
-// This is to make sure that the size of Version type remains stable as it
+// This is to make sure that the size of LBP_Version type remains stable as it
 // would be difficult to change it in a backwards compatible way.
 //
-#assert(#exists(Version));
-#assert(is_an_enum(Version));
-#assert(get_internal_enum_type(Version) == s32);
-#assert(enum_has_names(Version, .["INVALID", "INITIAL", "LATEST"]));
+#assert(#exists(LBP_Version));
+#assert(is_an_enum(LBP_Version));
+#assert(get_internal_enum_type(LBP_Version) == s32);
+#assert(enum_has_names(LBP_Version, .["INVALID", "INITIAL", "LATEST"]));
 
 LBP_Serializer :: struct {
-    data_version:      Version = .INVALID;
+    data_version:      LBP_Version = .INVALID;
     integrity_counter: s32;
     bytes:             [..]u8;
     offset_into_bytes: s64;
@@ -66,13 +66,19 @@ lbp_commit_to_disk :: (s: *LBP_Serializer) -> bool {
     return ok;
 }
 
-lbp_deinit :: (s: *LBP_Serializer) {
+
+lbp_deinit :: (s: *LBP_Serializer, clear_memory_before_dealloc := false) {
     //
     // For the duration of deserializing there is a null allocator on s.bytes
-    // to disallow allocations, but when freeing we use what we used when
-    // loading the bytes from the file.
+    // to disallow manipulating what was the original memory, but when freeing
+    // we want to actually free the loaded bytes.
+    //
+    // There is also an option to clear memory before deallocating it. This is
+    // potentially helpful for finding things that reference bytes in loaded
+    // memory.
     //
     s.bytes.allocator = context.allocator;
+    if clear_memory_before_dealloc memset(s.bytes.data, 0xAA, s.bytes.count);
     array_free(s.bytes);
 }
 
@@ -121,17 +127,7 @@ serialize :: (s: *LBP_Serializer, big_int: *S128) {
 }
 
 serialize :: (s: *LBP_Serializer, text: *string) {
-    if s.mode == {
-        case .SERIALIZE;
-            serialize(s, *text.count);
-            write_bytes(s, cast([]u8) text.*);
-
-        case .DESERIALIZE;
-            serialize(s, *text.count);
-            bytes := read_bytes(s, text.count);
-            assert(bytes.count == text.count);
-            text.data = bytes.data;
-    }
+    serialize(s, cast(*[]u8) text);
 }
 
 serialize :: (s: *LBP_Serializer, _bool: *bool) {
@@ -206,13 +202,13 @@ serialize :: (s: *LBP_Serializer, array: *[$N]$T) {
     }
 }
 
-add :: (s: *LBP_Serializer, $added_in_version: Version, datum: *$T) {
+add :: (s: *LBP_Serializer, $added_in_version: LBP_Version, datum: *$T) {
     if s.data_version >= added_in_version {
         serialize(s, datum);
     }
 }
 
-rem :: (s: *LBP_Serializer, $added_in_version: Version, $removed_in_version: Version, $T: Type) -> T {
+rem :: (s: *LBP_Serializer, $added_in_version: LBP_Version, $removed_in_version: LBP_Version, $T: Type) -> T {
     value: T;
 
     if s.data_version >= added_in_version && s.data_version < removed_in_version {
@@ -222,7 +218,7 @@ rem :: (s: *LBP_Serializer, $added_in_version: Version, $removed_in_version: Ver
     return value;
 }
 
-check_integrity :: (s: *LBP_Serializer, $added_in_version: Version) {
+check_integrity :: (s: *LBP_Serializer, $added_in_version: LBP_Version) {
     if s.data_version >= added_in_version {
         check := s.integrity_counter;
         serialize(s, *check);

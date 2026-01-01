@@ -2,7 +2,7 @@
 // To run tests: jai -x64 -quiet -no_dce tests/main.jai && tests/build/main
 //
 
-Program_Version :: enum #complete { V1; V2; V3; }
+Program_Version :: enum #complete { V1; V2; V3; V4; }
 
 compile :: (program_version: Program_Version) {
     version_name := tprint("%", program_version);
@@ -23,9 +23,7 @@ build_dir :: "build";
 build :: () {
     make_directory_if_it_does_not_exist(build_dir);
     set_build_options_dc(.{ output_path = build_dir });
-    compile(.V1);
-    compile(.V2);
-    compile(.V3);
+    for Program_Version.(*Type_Info_Enum).values compile(xx it);
 }
 
 #run build();
@@ -33,9 +31,7 @@ build :: () {
 main :: () {
     log("Running test scenarios..");
 
-    run(.V1);
-    run(.V2);
-    run(.V3);
+    for Program_Version.(*Type_Info_Enum).values run(xx it);
 
     log("Everything working as expected!");
 }
