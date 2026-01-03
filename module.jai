@@ -33,12 +33,19 @@ LBP_Serializer :: struct {
     Mode :: enum #complete { SERIALIZE; DESERIALIZE; }
 }
 
-lbp_init :: (file_path: string, mode: LBP_Serializer.Mode) -> bool, LBP_Serializer {
+LBP_Init_Error :: enum #complete {
+    NONE :: 0;
+    COULDNT_READ_FILE;
+    FILE_IS_NEWER_THAN_THE_SERIALIZATION_CODE;
+    READ_AN_INVALID_VERSION_IN_THE_FILE;
+}
+
+lbp_init :: (file_path: string, mode: LBP_Serializer.Mode) -> LBP_Init_Error, LBP_Serializer {
     bytes: [..]u8;
 
     if mode == .DESERIALIZE {
         bytes_as_str, ok := read_entire_file(file_path);
-        if !ok return false, .{};
+        if !ok return .COULDNT_READ_FILE, .{};
 
         bytes.data      = bytes_as_str.data;
         bytes.count     = bytes_as_str.count;
@@ -49,11 +56,14 @@ lbp_init :: (file_path: string, mode: LBP_Serializer.Mode) -> bool, LBP_Serializ
     serialize(*ser, *ser.data_version);
 
     if mode == .DESERIALIZE && ser.data_version > .LATEST {
-        return false, .{};
+        return .FILE_IS_NEWER_THAN_THE_SERIALIZATION_CODE, .{};
     }
 
-    assert(ser.data_version != .INVALID);
-    return true, ser;
+    if ser.data_version == .INVALID {
+        return .READ_AN_INVALID_VERSION_IN_THE_FILE, .{};
+    }
+
+    return .NONE, ser;
 }
 
 lbp_reserve :: inline (s: *LBP_Serializer, count: s64) {

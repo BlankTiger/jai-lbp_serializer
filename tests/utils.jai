@@ -9,13 +9,16 @@ compare_array :: (a: []$T, b: []T) {
 }
 
 save_game :: (path_to_save: string, state: *Game) -> bool {
-    ok, s := lbp_init(path_to_save, .SERIALIZE);
-    if !ok return false;
+    err, s := lbp_init(path_to_save, .SERIALIZE);
+    if err != .NONE {
+        log("Failed to init LBP_Serializer with a reason: %", err);
+        return false;
+    }
     defer lbp_deinit(*s, clear_memory_before_dealloc = true);
 
     serialize(*s, state);
 
-    ok = lbp_commit_to_disk(*s);
+    ok := lbp_commit_to_disk(*s);
     if ok log("Saved '%'.", path_to_save);
     else  log("Couldn't save '%'.", path_to_save);
 
@@ -23,8 +26,11 @@ save_game :: (path_to_save: string, state: *Game) -> bool {
 }
 
 load_game :: (path_to_save: string) -> bool, Game {
-    ok, s := lbp_init(path_to_save, .DESERIALIZE);
-    if !ok return false, .{};
+    err, s := lbp_init(path_to_save, .DESERIALIZE);
+    if err != .NONE {
+        log("Failed to init LBP_Serializer with a reason: %", err);
+        return false, .{};
+    }
     defer lbp_deinit(*s, clear_memory_before_dealloc = true);
 
     state: Game;
