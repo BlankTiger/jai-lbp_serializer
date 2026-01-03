@@ -96,8 +96,15 @@ read_type :: (s: *LBP_Serializer, $T: Type) -> T {
     return type;
 }
 
-write_bytes :: (s: *LBP_Serializer, bytes: []u8) {
+write_bytes :: inline (s: *LBP_Serializer, bytes: []u8) {
     array_add(*s.bytes, ..bytes);
+}
+
+write_type :: (s: *LBP_Serializer, value: *$T) {
+    bytes: []u8;
+    bytes.data  = xx value;
+    bytes.count = size_of(T);
+    write_bytes(s, bytes);
 }
 
 serialize :: (s: *LBP_Serializer, number: *$T) #modify { return is_a_number_type(T); } {
@@ -133,14 +140,10 @@ serialize :: (s: *LBP_Serializer, text: *string) {
 serialize :: (s: *LBP_Serializer, _bool: *bool) {
     if s.mode == {
         case .SERIALIZE;
-            bytes: []u8;
-            bytes.data  = xx _bool;
-            bytes.count = size_of(bool);
-            write_bytes(s, bytes);
+            write_type(s, _bool);
 
         case .DESERIALIZE;
-            bytes := read_bytes(s, size_of(bool));
-            _bool = xx bytes.data;
+            _bool.* = read_type(s, bool);
     }
 }
 

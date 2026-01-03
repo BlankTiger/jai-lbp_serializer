@@ -8,6 +8,7 @@ main :: () {
     game.timestamp     = current_time_monotonic();
     game.bytes         = .[#char "H", #char "E", #char "L", #char "L", #char "O"];
     game.name_ptr      = *name;
+    game.toggle        = true;
 
     save_file_path_V1 :: "tests/build/game_V1.dat";
     save_file_path_V2 :: "tests/build/game_V2.dat";
@@ -27,6 +28,7 @@ main :: () {
         assert(loaded_game_V1.timestamp == default_timestamp);
         compare_array(loaded_game_V1.bytes, .[]);
         assert(loaded_game_V1.name_ptr == null);
+        assert(loaded_game_V1.toggle == false);
     }
 
     {
@@ -37,6 +39,7 @@ main :: () {
         assert(loaded_game_V2.timestamp == default_timestamp);
         compare_array(loaded_game_V2.bytes, .[]);
         assert(loaded_game_V2.name_ptr == null);
+        assert(loaded_game_V2.toggle == false);
     }
 
     {
@@ -47,6 +50,7 @@ main :: () {
         assert(loaded_game_V3.timestamp != default_timestamp);
         compare_array(loaded_game_V3.bytes, .[]);
         assert(loaded_game_V3.name_ptr == null);
+        assert(loaded_game_V3.toggle == false);
     }
 
     {
@@ -57,6 +61,7 @@ main :: () {
         assert(loaded_game_V4.timestamp == game.timestamp);
         compare_array(loaded_game_V4.bytes, game.bytes);
         assert(loaded_game_V4.name_ptr.* == game.name_ptr.*);
+        assert(loaded_game_V4.toggle == true);
     }
 
     log("V4 works fine.");
@@ -67,8 +72,8 @@ LBP_Version :: enum s32 {
     INITIAL;
     ADDED_COLLECTOR;
     REMOVED_COLLECTOR_ADDED_TIMESTAMP;
-    ADDED_AN_ARRAY_OF_BYTES_AND_A_POINTER;
-    LATEST :: ADDED_AN_ARRAY_OF_BYTES_AND_A_POINTER;
+    ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL;
+    LATEST :: ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL;
 }
 
 Game :: struct {
@@ -76,6 +81,7 @@ Game :: struct {
     timestamp:     Apollo_Time;
     bytes:         []u8;
     name_ptr:      *string;
+    toggle:        bool;
 }
 
 serialize :: (s: *LBP_Serializer, game: *Game) {
@@ -88,9 +94,10 @@ serialize :: (s: *LBP_Serializer, game: *Game) {
     add(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP, *game.timestamp);
     check_integrity(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP);
 
-    add(s, .ADDED_AN_ARRAY_OF_BYTES_AND_A_POINTER, *game.bytes);
-    add(s, .ADDED_AN_ARRAY_OF_BYTES_AND_A_POINTER, *game.name_ptr);
-    check_integrity(s, .ADDED_AN_ARRAY_OF_BYTES_AND_A_POINTER);
+    add(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL, *game.bytes);
+    add(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL, *game.name_ptr);
+    add(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL, *game.toggle);
+    check_integrity(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL);
 }
 
 // An example of custom serializing behavior. Serializing a double pointer is not handled by default.
