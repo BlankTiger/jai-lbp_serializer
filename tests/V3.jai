@@ -56,13 +56,16 @@ Game :: struct {
 
 serialize :: (s: *LBP_Serializer, game: *Game) {
     add(s, .INITIAL, *game.list_of_names);
-    check_integrity(s, .INITIAL);
+    ok := check_integrity(s, .INITIAL);
+    assert(ok);
 
     rem(s, .ADDED_COLLECTOR, .REMOVED_COLLECTOR_ADDED_TIMESTAMP, [..]s64);
-    check_integrity(s, .ADDED_COLLECTOR);
+    ok = check_integrity(s, .ADDED_COLLECTOR);
+    assert(ok);
 
     add(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP, *game.timestamp);
-    check_integrity(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP);
+    ok = check_integrity(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP);
+    assert(ok);
 }
 
 #scope_file

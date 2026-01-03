@@ -28,7 +28,8 @@ Game :: struct {
 
 serialize :: (s: *LBP_Serializer, game: *Game) {
     add(s, .INITIAL, *game.list_of_names);
-    check_integrity(s, .INITIAL);
+    ok := check_integrity(s, .INITIAL);
+    assert(ok);
 }
 
 #scope_file

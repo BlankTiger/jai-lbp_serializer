@@ -45,10 +45,12 @@ Game :: struct {
 
 serialize :: (s: *LBP_Serializer, game: *Game) {
     add(s, .INITIAL, *game.list_of_names);
-    check_integrity(s, .INITIAL);
+    ok := check_integrity(s, .INITIAL);
+    assert(ok);
 
     add(s, .ADDED_COLLECTOR, *game.number_collector);
-    check_integrity(s, .ADDED_COLLECTOR);
+    ok = check_integrity(s, .ADDED_COLLECTOR);
+    assert(ok);
 }
 
 #scope_file

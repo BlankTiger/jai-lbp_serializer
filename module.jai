@@ -60,6 +60,10 @@ lbp_reserve :: inline (s: *LBP_Serializer, count: s64) {
     array_reserve(*s.bytes, count);
 }
 
+lbp_reset_integrity_counter :: inline (s: *LBP_Serializer) {
+    s.integrity_counter = 0;
+}
+
 lbp_commit_to_disk :: (s: *LBP_Serializer) -> bool {
     bytes_as_str := cast(string) s.bytes;
     ok := write_entire_file(s.path_to_save_file, bytes_as_str);
@@ -228,13 +232,20 @@ rem :: (s: *LBP_Serializer, $added_in_version: LBP_Version, $removed_in_version:
     return value;
 }
 
-check_integrity :: (s: *LBP_Serializer, $added_in_version: LBP_Version) {
+check_integrity :: (s: *LBP_Serializer, $added_in_version: LBP_Version) -> bool {
     if s.data_version >= added_in_version {
         check := s.integrity_counter;
         serialize(s, *check);
-        assert(check == s.integrity_counter, "Integrity check failed at version %. File counter: %, code counter: %.", added_in_version, check, s.integrity_counter);
+
+        if check != s.integrity_counter {
+            log("Integrity check failed at version %. File counter: %, code counter: %.", added_in_version, check, s.integrity_counter, flags = .ERROR);
+            return false;
+        }
+
         s.integrity_counter += 1;
     }
+
+    return true;
 }
 
 #scope_file

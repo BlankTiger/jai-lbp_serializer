@@ -86,18 +86,22 @@ Game :: struct {
 
 serialize :: (s: *LBP_Serializer, game: *Game) {
     add(s, .INITIAL, *game.list_of_names);
-    check_integrity(s, .INITIAL);
+    ok := check_integrity(s, .INITIAL);
+    assert(ok);
 
     rem(s, .ADDED_COLLECTOR, .REMOVED_COLLECTOR_ADDED_TIMESTAMP, [..]s64);
-    check_integrity(s, .ADDED_COLLECTOR);
+    ok = check_integrity(s, .ADDED_COLLECTOR);
+    assert(ok);
 
     add(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP, *game.timestamp);
-    check_integrity(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP);
+    ok = check_integrity(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP);
+    assert(ok);
 
     add(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL, *game.bytes);
     add(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL, *game.name_ptr);
     add(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL, *game.toggle);
-    check_integrity(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL);
+    ok = check_integrity(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL);
+    assert(ok);
 }
 
 // An example of custom serializing behavior. Serializing a double pointer is not handled by default.
