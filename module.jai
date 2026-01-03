@@ -97,6 +97,7 @@ lbp_deinit :: (s: *LBP_Serializer, clear_memory_before_dealloc := false) {
 }
 
 read_bytes :: (s: *LBP_Serializer, byte_count: s64) -> []u8 {
+    assert(s.offset_into_bytes + byte_count <= s.bytes.count, "Read overflow.");
     bytes: []u8;
     bytes.data  = s.bytes.data + s.offset_into_bytes;
     bytes.count = byte_count;
