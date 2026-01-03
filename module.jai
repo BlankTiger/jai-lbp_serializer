@@ -172,7 +172,10 @@ serialize :: (s: *LBP_Serializer, apollo_time: *Apollo_Time) {
 serialize :: (s: *LBP_Serializer, resizable_array: *[..]$T) {
     count := resizable_array.count;
     serialize(s, *count);
-    array_resize(resizable_array, count);
+
+    if s.mode == .DESERIALIZE {
+        array_resize(resizable_array, count);
+    }
 
     for * resizable_array.* {
         serialize(s, it);
@@ -183,9 +186,19 @@ serialize :: (s: *LBP_Serializer, array: *[]$T) {
     count := array.count;
     serialize(s, *count);
 
-    if array.count != count {
-        new_array, _unaligned_base := NewArray(count, T);
-        array.* = new_array;
+    if s.mode == .DESERIALIZE {
+        // @TODO: Maybe should actually assert that array.count should be 0
+        // when deserializing. Otherwise it kind of implies that the user
+        // already did something with the deserialization destination. Maybe
+        // they tried to preallocate? It kind of wouldn't make sense, since
+        // this ends up as one allocation anyway, because we store the count
+        // first.
+        //
+        // Or... Maybe they tried to deserialize onto an in-use structure?
+        // Probably should be allowed, but reported back somehow.
+        if array.count != count {
+            array.* = NewArray(count, T);
+        }
     }
 
     for * array.* {
