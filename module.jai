@@ -189,6 +189,7 @@ serialize :: (s: *LBP_Serializer, resizable_array: *[..]$T) {
     serialize(s, *count);
 
     if s.mode == .DESERIALIZE {
+        assert(resizable_array.count == 0, ARRAY_DESERIALIZATION_MISUSE_ERROR_MSG);
         array_resize(resizable_array, count);
     }
 
@@ -202,16 +203,13 @@ serialize :: (s: *LBP_Serializer, array: *[]$T) {
     serialize(s, *count);
 
     if s.mode == .DESERIALIZE {
-        // @TODO: Maybe should actually assert that array.count should be 0
-        // when deserializing. Otherwise it kind of implies that the user
-        // already did something with the deserialization destination. Maybe
-        // they tried to preallocate? It kind of wouldn't make sense, since
-        // this ends up as one allocation anyway, because we store the count
-        // first.
         //
-        // Or... Maybe they tried to deserialize onto an in-use structure?
-        // Probably should be allowed, but reported back somehow.
-        if array.count != count {
+        // Probably should be allowed, but reported back somehow. For now
+        // disallowing it as I do not see a real use-case.
+        // 
+        assert(array.count == 0, ARRAY_DESERIALIZATION_MISUSE_ERROR_MSG);
+
+        if count > 0 {
             array.* = NewArray(count, T);
         }
     }
@@ -260,6 +258,8 @@ check_integrity :: (s: *LBP_Serializer, $added_in_version: LBP_Version) -> bool 
 }
 
 #scope_file
+
+ARRAY_DESERIALIZATION_MISUSE_ERROR_MSG :: "Deserialize into fresh memory only. If you hit this with a legitimate use-case, then I might reconsider.";
 
 null_allocator: Allocator = .{
     data = null,
