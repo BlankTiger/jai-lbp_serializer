@@ -110,10 +110,7 @@ write_type :: (s: *LBP_Serializer, value: *$T) {
 serialize :: (s: *LBP_Serializer, number: *$T) #modify { return is_a_number_type(T); } {
     if s.mode == {
         case .SERIALIZE;
-            bytes: []u8;
-            bytes.data  = xx number;
-            bytes.count = size_of(T);
-            write_bytes(s, bytes);
+            write_type(s, number);
 
         case .DESERIALIZE;
             number.* = read_type(s, T);
@@ -123,10 +120,7 @@ serialize :: (s: *LBP_Serializer, number: *$T) #modify { return is_a_number_type
 serialize :: (s: *LBP_Serializer, big_int: *S128) {
     if s.mode == {
         case .SERIALIZE;
-            bytes: []u8;
-            bytes.data  = xx big_int;
-            bytes.count = size_of(S128);
-            write_bytes(s, bytes);
+            write_type(s, big_int);
 
         case .DESERIALIZE;
             big_int.* = read_type(s, S128);
