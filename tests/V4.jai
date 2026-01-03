@@ -67,15 +67,6 @@ main :: () {
     log("V4 works fine.");
 }
 
-LBP_Version :: enum s32 {
-    INVALID :: -1;
-    INITIAL;
-    ADDED_COLLECTOR;
-    REMOVED_COLLECTOR_ADDED_TIMESTAMP;
-    ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL;
-    LATEST :: ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL;
-}
-
 Game :: struct {
     list_of_names: []string;
     timestamp:     Apollo_Time;
@@ -84,41 +75,52 @@ Game :: struct {
     toggle:        bool;
 }
 
-serialize :: (s: *LBP_Serializer, game: *Game) {
-    add(s, .INITIAL, *game.list_of_names);
-    ok := check_integrity(s, .INITIAL);
-    assert(ok);
+Serializer_Info :: struct {
+    Version :: enum s32 {
+        INVALID :: -1;
+        INITIAL;
+        ADDED_COLLECTOR;
+        REMOVED_COLLECTOR_ADDED_TIMESTAMP;
+        ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL;
+        LATEST :: ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL;
+    }
 
-    rem(s, .ADDED_COLLECTOR, .REMOVED_COLLECTOR_ADDED_TIMESTAMP, [..]s64);
-    ok = check_integrity(s, .ADDED_COLLECTOR);
-    assert(ok);
+    serialize :: (s: *LBP_Serializer, game: *Game) {
+        add(s, .INITIAL, *game.list_of_names);
+        ok := check_integrity(s, .INITIAL);
+        assert(ok);
 
-    add(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP, *game.timestamp);
-    ok = check_integrity(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP);
-    assert(ok);
+        rem(s, .ADDED_COLLECTOR, .REMOVED_COLLECTOR_ADDED_TIMESTAMP, [..]s64);
+        ok = check_integrity(s, .ADDED_COLLECTOR);
+        assert(ok);
 
-    add(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL, *game.bytes);
-    add(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL, *game.name_ptr);
-    add(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL, *game.toggle);
-    ok = check_integrity(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL);
-    assert(ok);
-}
+        add(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP, *game.timestamp);
+        ok = check_integrity(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP);
+        assert(ok);
 
-// An example of custom serializing behavior. Serializing a double pointer is not handled by default.
-serialize :: (s: *LBP_Serializer, str_ptr: **string) {
-    if s.mode == {
-        case .SERIALIZE;
-            serialize(s, str_ptr.*);
+        add(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL, *game.bytes);
+        add(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL, *game.name_ptr);
+        add(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL, *game.toggle);
+        ok = check_integrity(s, .ADDED_AN_ARRAY_OF_BYTES_A_POINTER_AND_A_BOOL);
+        assert(ok);
+    }
 
-        case .DESERIALIZE;
-            new_str_ptr := New(string);
-            serialize(s, new_str_ptr);
-            str_ptr.* = new_str_ptr;
+    // An example of custom serializing behavior. Serializing a double pointer is not handled by default.
+    serialize :: (s: *LBP_Serializer, str_ptr: **string) {
+        if s.mode == {
+            case .SERIALIZE;
+                serialize(s, str_ptr.*);
+
+            case .DESERIALIZE;
+                new_str_ptr := New(string);
+                serialize(s, new_str_ptr);
+                str_ptr.* = new_str_ptr;
+        }
     }
 }
 
 #scope_file
 
 #load "utils.jai";
-#load "../module.jai";
+#import,file "../module.jai"(Serializer_Info);
 #import "Basic";

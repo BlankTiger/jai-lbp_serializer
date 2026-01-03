@@ -1,29 +1,41 @@
 //
 // All credit for the methodology goes to https://handmade.network/p/29/swedish-cubes-for-unity/blog/p/2723-how_media_molecule_does_serialization
 //
-// This module is expected to be used as a #load dependency. User of it is
-// expected to provide a LBP_Version enum with requirements specified in the module
-// code below.
-//
-// Originally this was an #import module parametrized by LBP_Version type with
-// program parameters, but user defined serialize procedures were not seen by
-// the compiler when calling add and rem.
-//
 // If you deserialize arrays, then stuff will be allocated by the context.allocator
 // to make that happen.
 //
 
 //
-// This is to make sure that the size of LBP_Version type remains stable as it
-// would be difficult to change it in a backwards compatible way.
+// You are expected to provide a type with a Version enum and all the serialize
+// overloads you need the LBP_Serializer procedures to see. If you need more
+// examples try to look into how the tests work.
 //
-#assert(#exists(LBP_Version));
-#assert(is_an_enum(LBP_Version));
-#assert(get_internal_enum_type(LBP_Version) == s32);
-#assert(enum_has_names(LBP_Version, .["INVALID", "INITIAL", "LATEST"]));
+//     Example_Serializer_Info :: struct {
+//         Version :: enum s32 {
+//             INVALID :: -1;
+//             INITIAL;
+//             LATEST :: INITIAL;
+//         }
+//
+//         serialize :: (s: *LBP_Serializer, something_bespoke: *Something_Bespoke) {
+//             // ...
+//         }
+//     }
+//
+#module_parameters(Serializer_Info: Type);
+
+using Serializer_Info;
+
+#assert(#exists(Version));
+#assert(is_an_enum(Version));
+#assert(get_internal_enum_type(Version) == s32);
+#assert(enum_has_names(Version, .["INVALID", "INITIAL", "LATEST"]));
+
+// @TODO: A generic serialize that could be used when the user doesn't need to
+// guarantee forwards compatibility.
 
 LBP_Serializer :: struct {
-    data_version:      LBP_Version = .INVALID;
+    data_version:      Version = .INVALID;
     integrity_counter: s32;
     bytes:             [..]u8;
     offset_into_bytes: s64;
@@ -37,7 +49,7 @@ LBP_Init_Error :: enum #complete {
     NONE :: 0;
     COULDNT_READ_FILE;
     FILE_IS_NEWER_THAN_THE_SERIALIZATION_CODE;
-    READ_AN_INVALID_VERSION_IN_THE_FILE;
+    READ_AN_INVALID_VERSION_FROM_THE_FILE;
 }
 
 lbp_init :: (file_path: string, mode: LBP_Serializer.Mode) -> LBP_Init_Error, LBP_Serializer {
@@ -60,7 +72,7 @@ lbp_init :: (file_path: string, mode: LBP_Serializer.Mode) -> LBP_Init_Error, LB
     }
 
     if ser.data_version == .INVALID {
-        return .READ_AN_INVALID_VERSION_IN_THE_FILE, .{};
+        return .READ_AN_INVALID_VERSION_FROM_THE_FILE, .{};
     }
 
     return .NONE, ser;
@@ -206,7 +218,7 @@ serialize :: (s: *LBP_Serializer, array: *[]$T) {
         //
         // Probably should be allowed, but reported back somehow. For now
         // disallowing it as I do not see a real use-case.
-        // 
+        //
         assert(array.count == 0, ARRAY_DESERIALIZATION_MISUSE_ERROR_MSG);
 
         if count > 0 {
@@ -225,13 +237,13 @@ serialize :: (s: *LBP_Serializer, array: *[$N]$T) {
     }
 }
 
-add :: (s: *LBP_Serializer, $added_in_version: LBP_Version, datum: *$T) {
+add :: (s: *LBP_Serializer, $added_in_version: Version, datum: *$T) {
     if s.data_version >= added_in_version {
         serialize(s, datum);
     }
 }
 
-rem :: (s: *LBP_Serializer, $added_in_version: LBP_Version, $removed_in_version: LBP_Version, $T: Type) -> T {
+rem :: (s: *LBP_Serializer, $added_in_version: Version, $removed_in_version: Version, $T: Type) -> T {
     value: T;
 
     if s.data_version >= added_in_version && s.data_version < removed_in_version {
@@ -241,7 +253,7 @@ rem :: (s: *LBP_Serializer, $added_in_version: LBP_Version, $removed_in_version:
     return value;
 }
 
-check_integrity :: (s: *LBP_Serializer, $added_in_version: LBP_Version) -> bool {
+check_integrity :: (s: *LBP_Serializer, $added_in_version: Version) -> bool {
     if s.data_version >= added_in_version {
         check := s.integrity_counter;
         serialize(s, *check);

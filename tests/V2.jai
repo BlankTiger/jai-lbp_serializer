@@ -31,30 +31,32 @@ main :: () {
     log("V2 works fine.");
 }
 
-LBP_Version :: enum s32 {
-    INVALID :: -1;
-    INITIAL;
-    ADDED_COLLECTOR;
-    LATEST :: ADDED_COLLECTOR;
-}
-
 Game :: struct {
     list_of_names:    []string;
     number_collector: [..]s64;
 }
 
-serialize :: (s: *LBP_Serializer, game: *Game) {
-    add(s, .INITIAL, *game.list_of_names);
-    ok := check_integrity(s, .INITIAL);
-    assert(ok);
-
-    add(s, .ADDED_COLLECTOR, *game.number_collector);
-    ok = check_integrity(s, .ADDED_COLLECTOR);
-    assert(ok);
-}
-
 #scope_file
 
+Serializer_Info :: struct {
+    Version :: enum s32 {
+        INVALID :: -1;
+        INITIAL;
+        ADDED_COLLECTOR;
+        LATEST :: ADDED_COLLECTOR;
+    }
+
+    serialize :: (s: *LBP_Serializer, game: *Game) {
+        add(s, .INITIAL, *game.list_of_names);
+        ok := check_integrity(s, .INITIAL);
+        assert(ok);
+
+        add(s, .ADDED_COLLECTOR, *game.number_collector);
+        ok = check_integrity(s, .ADDED_COLLECTOR);
+        assert(ok);
+    }
+}
+
 #load "utils.jai";
-#load "../module.jai";
+#import,file "../module.jai"(Serializer_Info);
 #import "Basic";

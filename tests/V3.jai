@@ -41,35 +41,37 @@ main :: () {
     log("V3 works fine.");
 }
 
-LBP_Version :: enum s32 {
-    INVALID :: -1;
-    INITIAL;
-    ADDED_COLLECTOR;
-    REMOVED_COLLECTOR_ADDED_TIMESTAMP;
-    LATEST :: REMOVED_COLLECTOR_ADDED_TIMESTAMP;
-}
-
 Game :: struct {
     list_of_names: []string;
     timestamp:     Apollo_Time;
 }
 
-serialize :: (s: *LBP_Serializer, game: *Game) {
-    add(s, .INITIAL, *game.list_of_names);
-    ok := check_integrity(s, .INITIAL);
-    assert(ok);
+Serializer_Info :: struct {
+    Version :: enum s32 {
+        INVALID :: -1;
+        INITIAL;
+        ADDED_COLLECTOR;
+        REMOVED_COLLECTOR_ADDED_TIMESTAMP;
+        LATEST :: REMOVED_COLLECTOR_ADDED_TIMESTAMP;
+    }
 
-    rem(s, .ADDED_COLLECTOR, .REMOVED_COLLECTOR_ADDED_TIMESTAMP, [..]s64);
-    ok = check_integrity(s, .ADDED_COLLECTOR);
-    assert(ok);
+    serialize :: (s: *LBP_Serializer, game: *Game) {
+        add(s, .INITIAL, *game.list_of_names);
+        ok := check_integrity(s, .INITIAL);
+        assert(ok);
 
-    add(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP, *game.timestamp);
-    ok = check_integrity(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP);
-    assert(ok);
+        rem(s, .ADDED_COLLECTOR, .REMOVED_COLLECTOR_ADDED_TIMESTAMP, [..]s64);
+        ok = check_integrity(s, .ADDED_COLLECTOR);
+        assert(ok);
+
+        add(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP, *game.timestamp);
+        ok = check_integrity(s, .REMOVED_COLLECTOR_ADDED_TIMESTAMP);
+        assert(ok);
+    }
 }
 
 #scope_file
 
 #load "utils.jai";
-#load "../module.jai";
+#import,file "../module.jai"(Serializer_Info);
 #import "Basic";
