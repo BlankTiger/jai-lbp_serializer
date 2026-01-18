@@ -35,12 +35,13 @@ using Serializer_Info;
 // guarantee forwards compatibility.
 
 LBP_Serializer :: struct {
-    data_version:      Version = .INVALID;
-    integrity_counter: s32;
-    bytes:             [..]u8;
-    offset_into_bytes: s64;
-    path_to_save_file: string;
-    mode:              Mode;
+    data_version:       Version = .INVALID;
+    integrity_counter:  s32;
+    bytes:              [..]u8;
+    offset_into_bytes:  s64;
+    path_to_save_file:  string;
+    mode:               Mode;
+    initted_with_bytes: bool;
 
     Mode :: enum #complete { SERIALIZE; DESERIALIZE; }
 }
@@ -48,8 +49,33 @@ LBP_Serializer :: struct {
 LBP_Init_Error :: enum #complete {
     NONE :: 0;
     COULDNT_READ_FILE;
-    FILE_IS_NEWER_THAN_THE_SERIALIZATION_CODE;
-    READ_AN_INVALID_VERSION_FROM_THE_FILE;
+    DATA_IS_NEWER_THAN_THE_SERIALIZATION_CODE;
+    READ_AN_INVALID_VERSION_FROM_THE_DATA;
+    INITIALIZING_WITH_BYTES_IS_ONLY_SUPPORTED_FOR_DESERIALIZING;
+}
+
+lbp_init :: (bytes: []u8, mode: LBP_Serializer.Mode) -> LBP_Init_Error, LBP_Serializer {
+    if mode != .DESERIALIZE {
+        return .INITIALIZING_WITH_BYTES_IS_ONLY_SUPPORTED_FOR_DESERIALIZING, .{};
+    }
+
+    _bytes: [..]u8;
+    _bytes.data      = bytes.data;
+    _bytes.count     = bytes.count;
+    _bytes.allocator = null_allocator;
+
+    ser: LBP_Serializer = .{ .LATEST, 0, _bytes, 0, "", mode, true };
+    serialize(*ser, *ser.data_version);
+
+    if ser.data_version > .LATEST {
+        return .DATA_IS_NEWER_THAN_THE_SERIALIZATION_CODE, .{};
+    }
+
+    if ser.data_version == .INVALID {
+        return .READ_AN_INVALID_VERSION_FROM_THE_DATA, .{};
+    }
+
+    return .NONE, ser;
 }
 
 lbp_init :: (file_path: string, mode: LBP_Serializer.Mode) -> LBP_Init_Error, LBP_Serializer {
@@ -64,15 +90,15 @@ lbp_init :: (file_path: string, mode: LBP_Serializer.Mode) -> LBP_Init_Error, LB
         bytes.allocator = null_allocator;
     }
 
-    ser: LBP_Serializer = .{ .LATEST, 0, bytes, 0, file_path, mode };
+    ser: LBP_Serializer = .{ .LATEST, 0, bytes, 0, file_path, mode, false };
     serialize(*ser, *ser.data_version);
 
     if mode == .DESERIALIZE && ser.data_version > .LATEST {
-        return .FILE_IS_NEWER_THAN_THE_SERIALIZATION_CODE, .{};
+        return .DATA_IS_NEWER_THAN_THE_SERIALIZATION_CODE, .{};
     }
 
     if ser.data_version == .INVALID {
-        return .READ_AN_INVALID_VERSION_FROM_THE_FILE, .{};
+        return .READ_AN_INVALID_VERSION_FROM_THE_DATA, .{};
     }
 
     return .NONE, ser;
@@ -94,6 +120,14 @@ lbp_commit_to_disk :: (s: *LBP_Serializer) -> bool {
 
 
 lbp_deinit :: (s: *LBP_Serializer, clear_memory_before_dealloc := false) {
+    if s.initted_with_bytes {
+        //
+        // When initting with bytes the whole idea is that we don't own them,
+        // so don't try to deallocate anything here..
+        //
+        assert(s.mode == .DESERIALIZE);
+        return;
+    }
     //
     // For the duration of deserializing there is a null allocator on s.bytes
     // to disallow manipulating what was the original memory, but when freeing
