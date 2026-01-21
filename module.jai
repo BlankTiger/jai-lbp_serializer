@@ -39,15 +39,16 @@ LBP_Serializer :: struct {
     integrity_counter:  s32;
     bytes:              [..]u8;
     offset_into_bytes:  s64;
-    path_to_save_file:  string;
+    file:               File;
     mode:               Mode;
     initted_with_bytes: bool;
 
-    Mode :: enum #complete { SERIALIZE; DESERIALIZE; }
+    Mode :: enum u8 #complete { SERIALIZE; DESERIALIZE; }
 }
 
-LBP_Init_Error :: enum #complete {
+LBP_Init_Error :: enum u8 #complete {
     NONE :: 0;
+    COULDNT_OPEN_FILE;
     COULDNT_READ_FILE;
     DATA_IS_NEWER_THAN_THE_SERIALIZATION_CODE;
     READ_AN_INVALID_VERSION_FROM_THE_DATA;
@@ -64,7 +65,7 @@ lbp_init :: (bytes: []u8, mode: LBP_Serializer.Mode) -> LBP_Init_Error, LBP_Seri
     _bytes.count     = bytes.count;
     _bytes.allocator = null_allocator;
 
-    ser: LBP_Serializer = .{ .LATEST, 0, _bytes, 0, "", mode, true };
+    ser: LBP_Serializer = .{ .LATEST, 0, _bytes, 0, .{}, mode, true };
     serialize(*ser, *ser.data_version);
 
     if ser.data_version > .LATEST {
@@ -78,11 +79,14 @@ lbp_init :: (bytes: []u8, mode: LBP_Serializer.Mode) -> LBP_Init_Error, LBP_Seri
     return .NONE, ser;
 }
 
-lbp_init :: (file_path: string, mode: LBP_Serializer.Mode) -> LBP_Init_Error, LBP_Serializer {
+//
+// Takes ownership of the file, lbp_deinit will close it.
+//
+lbp_init :: (file: File, mode: LBP_Serializer.Mode) -> LBP_Init_Error, LBP_Serializer {
     bytes: [..]u8;
 
     if mode == .DESERIALIZE {
-        bytes_as_str, ok := read_entire_file(file_path);
+        bytes_as_str, ok := read_entire_file(file);
         if !ok return .COULDNT_READ_FILE, .{};
 
         bytes.data      = bytes_as_str.data;
@@ -90,7 +94,7 @@ lbp_init :: (file_path: string, mode: LBP_Serializer.Mode) -> LBP_Init_Error, LB
         bytes.allocator = null_allocator;
     }
 
-    ser: LBP_Serializer = .{ .LATEST, 0, bytes, 0, file_path, mode, false };
+    ser: LBP_Serializer = .{ .LATEST, 0, bytes, 0, file, mode, false };
     serialize(*ser, *ser.data_version);
 
     if mode == .DESERIALIZE && ser.data_version > .LATEST {
@@ -104,6 +108,19 @@ lbp_init :: (file_path: string, mode: LBP_Serializer.Mode) -> LBP_Init_Error, LB
     return .NONE, ser;
 }
 
+lbp_init :: (file_path: string, mode: LBP_Serializer.Mode) -> LBP_Init_Error, LBP_Serializer {
+    file, ok := file_open(file_path, for_writing = mode == .SERIALIZE);
+    if !ok {
+        return .COULDNT_OPEN_FILE, .{};
+    }
+
+    err: LBP_Init_Error;
+    defer if err != .NONE file_close(*file);
+
+    err=, ser := lbp_init(file, mode);
+    return err, ser;
+}
+
 lbp_reserve :: inline (s: *LBP_Serializer, count: s64) {
     array_reserve(*s.bytes, count);
 }
@@ -114,10 +131,9 @@ lbp_reset_integrity_counter :: inline (s: *LBP_Serializer) {
 
 lbp_commit_to_disk :: (s: *LBP_Serializer) -> bool {
     bytes_as_str := cast(string) s.bytes;
-    ok := write_entire_file(s.path_to_save_file, bytes_as_str);
+    ok := file_write(*s.file, bytes_as_str);
     return ok;
 }
-
 
 lbp_deinit :: (s: *LBP_Serializer, clear_memory_before_dealloc := false) {
     if s.initted_with_bytes {
@@ -128,6 +144,7 @@ lbp_deinit :: (s: *LBP_Serializer, clear_memory_before_dealloc := false) {
         assert(s.mode == .DESERIALIZE);
         return;
     }
+
     //
     // For the duration of deserializing there is a null allocator on s.bytes
     // to disallow manipulating what was the original memory, but when freeing
@@ -140,6 +157,7 @@ lbp_deinit :: (s: *LBP_Serializer, clear_memory_before_dealloc := false) {
     s.bytes.allocator = context.allocator;
     if clear_memory_before_dealloc memset(s.bytes.data, 0xAA, s.bytes.count);
     array_free(s.bytes);
+    file_close(*s.file);
 }
 
 read_bytes :: (s: *LBP_Serializer, byte_count: s64) -> []u8 {
